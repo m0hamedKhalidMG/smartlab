@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>إدارة المستخدمين — Smart Lab</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-brand"><i class="fas fa-laptop-code"></i><span>Smart Lab</span></div>
+    <nav class="sidebar-nav">
+      <a href="/dashboard.html"   class="nav-item" data-page="dashboard.html"   data-roles="admin,technician">        <i class="fas fa-gauge-high"></i>           لوحة التحكم</a>
+      <a href="/devices.html"     class="nav-item" data-page="devices.html"     data-roles="admin,technician">        <i class="fas fa-desktop"></i>             الأجهزة</a>
+      <a href="/issues.html"      class="nav-item" data-page="issues.html"      data-roles="admin,technician,user">   <i class="fas fa-triangle-exclamation"></i> بلاغاتي</a>
+      <a href="/maintenance.html" class="nav-item" data-page="maintenance.html" data-roles="admin,technician">        <i class="fas fa-screwdriver-wrench"></i>   الصيانة</a>
+      <a href="/map.html"         class="nav-item" data-page="map.html"         data-roles="admin,technician">        <i class="fas fa-map"></i>                 الخريطة</a>
+      <a href="/alerts.html"      class="nav-item" data-page="alerts.html"      data-roles="admin,technician">        <i class="fas fa-bell"></i>                التنبيهات</a>
+      <a href="/ai.html"          class="nav-item" data-page="ai.html"          data-roles="admin,technician,user">   <i class="fas fa-robot"></i>               مساعد AI</a>
+      <a href="/reports.html"     class="nav-item" data-page="reports.html"     data-roles="admin,technician">        <i class="fas fa-chart-bar"></i>           التقارير</a>
+      <a href="/admin.html"       class="nav-item" data-page="admin.html"       data-roles="admin">                  <i class="fas fa-users-cog"></i>              المستخدمون</a>
+    </nav>
+    <div class="sidebar-footer">Smart Lab &copy; 2026</div>
+  </aside>
+
+  <header class="topbar">
+    <span class="topbar-title">إدارة المستخدمين</span>
+    <div class="topbar-actions">
+      <div class="alert-bell" onclick="window.location='/alerts.html'"><i class="fas fa-bell"></i><span class="badge-count" id="unread-count" style="display:none">0</span></div>
+      <div class="topbar-user"><div class="avatar" id="user-avatar">م</div><span id="user-name">مستخدم</span></div>
+      <button class="btn btn-outline btn-sm" id="logout-btn"><i class="fas fa-sign-out-alt"></i> خروج</button>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h2 class="page-title">إدارة المستخدمين</h2>
+      <button class="btn btn-primary" id="add-btn"><i class="fas fa-plus"></i> إضافة مستخدم</button>
+    </div>
+
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>#</th><th>الاسم</th><th>البريد الإلكتروني</th><th>الدور</th><th>تاريخ الإنشاء</th><th>إجراءات</th></tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr><td colspan="6" style="text-align:center;padding:2rem"><i class="fas fa-spinner fa-spin"></i></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal إضافة/تعديل -->
+  <div class="modal-overlay hidden" id="modal-overlay">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <span id="modal-title">إضافة مستخدم</span>
+        <button class="modal-close" id="modal-close"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="user-form">
+          <input type="hidden" id="edit-id" />
+          <div class="form-group"><label class="form-label">الاسم *</label><input class="form-control" id="f-name" required /></div>
+          <div class="form-group"><label class="form-label">البريد الإلكتروني *</label><input class="form-control" id="f-email" type="email" required /></div>
+          <div class="form-group"><label class="form-label">الدور *</label>
+            <select class="form-control" id="f-role" required>
+              <option value="user">مستخدم</option>
+              <option value="technician">فني</option>
+              <option value="admin">مشرف</option>
+            </select>
+          </div>
+          <div class="form-group" id="pw-group">
+            <label class="form-label">كلمة المرور *</label>
+            <input class="form-control" id="f-pass" type="password" placeholder="8 أحرف على الأقل" />
+            <small class="form-hint" id="pw-hint"></small>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="modal-cancel">إلغاء</button>
+        <button class="btn btn-primary" id="modal-save"><i class="fas fa-save"></i> حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireRole, apiGet, apiPost, apiPut, apiDel, fillTopbar, setActiveNav, logout, toast, formatDate, filterSidebar } from '/js/api.js';
+
+    const user = requireRole('admin'); if(!user) throw new Error('stop');
+    fillTopbar(); setActiveNav();
+    filterSidebar();
+    document.getElementById('logout-btn').addEventListener('click', logout);
+
+    const ROLE_LBL = { admin:'مشرف', technician:'فني', user:'مستخدم' };
+    const ROLE_MAP = { admin:'badge-broken', technician:'badge-maintenance', user:'badge-working' };
+    let editMode   = false;
+
+    async function load() {
+      const res   = await apiGet('/api/users');
+      const tbody = document.getElementById('users-tbody');
+      if (!res.users.length) {
+        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><i class="fas fa-users"></i><p>لا يوجد مستخدمون</p></div></td></tr>';
+        return;
+      }
+      tbody.innerHTML = res.users.map((u,i) => `
+        <tr>
+          <td>${i+1}</td>
+          <td><strong>${u.name}</strong></td>
+          <td>${u.email}</td>
+          <td><span class="badge ${ROLE_MAP[u.role]}">${ROLE_LBL[u.role]}</span></td>
+          <td>${formatDate(u.created_at)}</td>
+          <td>
+            <button class="btn btn-outline btn-sm btn-icon" onclick="openEdit(${u.id},'${u.name}','${u.email}','${u.role}')" title="تعديل"><i class="fas fa-pen"></i></button>
+            ${u.id!==user.id ? `<button class="btn btn-danger btn-sm btn-icon" onclick="delUser(${u.id},'${u.name}')" title="حذف"><i class="fas fa-trash"></i></button>` : ''}
+          </td>
+        </tr>`).join('');
+
+      // Unread alerts
+      try { const a=await apiGet('/api/alerts?is_read=0'); if(a.unread>0){const el=document.getElementById('unread-count');el.textContent=a.unread;el.style.display='flex';} } catch{}
+    }
+
+    // Modal
+    const overlay = document.getElementById('modal-overlay');
+    function openModal(title) { document.getElementById('modal-title').textContent=title; overlay.classList.remove('hidden'); }
+    function closeModal() { overlay.classList.add('hidden'); }
+
+    document.getElementById('add-btn').addEventListener('click', () => {
+      editMode=false;
+      document.getElementById('user-form').reset();
+      document.getElementById('edit-id').value='';
+      document.getElementById('pw-hint').textContent='';
+      document.getElementById('f-pass').required=true;
+      openModal('إضافة مستخدم جديد');
+    });
+
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    document.getElementById('modal-cancel').addEventListener('click', closeModal);
+
+    window.openEdit = (id, name, email, role) => {
+      editMode=true;
+      document.getElementById('edit-id').value  = id;
+      document.getElementById('f-name').value   = name;
+      document.getElementById('f-email').value  = email;
+      document.getElementById('f-role').value   = role;
+      document.getElementById('f-pass').value   = '';
+      document.getElementById('f-pass').required= false;
+      document.getElementById('pw-hint').textContent = 'اتركها فارغة للإبقاء على كلمة المرور الحالية';
+      openModal('تعديل المستخدم');
+    };
+
+    document.getElementById('modal-save').addEventListener('click', async () => {
+      const id    = document.getElementById('edit-id').value;
+      const body  = {
+        name:  document.getElementById('f-name').value,
+        email: document.getElementById('f-email').value,
+        role:  document.getElementById('f-role').value,
+      };
+      const pw = document.getElementById('f-pass').value;
+      if (pw) body.password = pw;
+
+      try {
+        if (id) await apiPut(`/api/users/${id}`, body);
+        else    await apiPost('/api/users', { ...body, password: pw });
+        closeModal(); toast(id?'تم التعديل':'تم الإضافة','success'); load();
+      } catch(e) { toast(e.message, 'error'); }
+    });
+
+    window.delUser = async (id, name) => {
+      if(!confirm(`سيتم حذف "${name}" نهائيًا. متأكد؟`)) return;
+      try { await apiDel(`/api/users/${id}`); toast('تم الحذف','success'); load(); }
+      catch(e) { toast(e.message,'error'); }
+    };
+
+    load();
+  </script>
+</body>
+</html>

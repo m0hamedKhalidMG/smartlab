@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>التقارير — Smart Lab</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-brand"><i class="fas fa-laptop-code"></i><span>Smart Lab</span></div>
+    <nav class="sidebar-nav">
+      <a href="/dashboard.html"   class="nav-item" data-page="dashboard.html"   data-roles="admin,technician">        <i class="fas fa-gauge-high"></i>           لوحة التحكم</a>
+      <a href="/devices.html"     class="nav-item" data-page="devices.html"     data-roles="admin,technician">        <i class="fas fa-desktop"></i>             الأجهزة</a>
+      <a href="/issues.html"      class="nav-item" data-page="issues.html"      data-roles="admin,technician,user">   <i class="fas fa-triangle-exclamation"></i> بلاغاتي</a>
+      <a href="/maintenance.html" class="nav-item" data-page="maintenance.html" data-roles="admin,technician">        <i class="fas fa-screwdriver-wrench"></i>   الصيانة</a>
+      <a href="/map.html"         class="nav-item" data-page="map.html"         data-roles="admin,technician">        <i class="fas fa-map"></i>                 الخريطة</a>
+      <a href="/alerts.html"      class="nav-item" data-page="alerts.html"      data-roles="admin,technician">        <i class="fas fa-bell"></i>                التنبيهات</a>
+      <a href="/ai.html"          class="nav-item" data-page="ai.html"          data-roles="admin,technician,user">   <i class="fas fa-robot"></i>               مساعد AI</a>
+      <a href="/reports.html"     class="nav-item" data-page="reports.html"     data-roles="admin,technician">        <i class="fas fa-chart-bar"></i>           التقارير</a>
+      <a href="/admin.html"       class="nav-item" data-page="admin.html" id="admin-link" data-roles="admin">         <i class="fas fa-users-cog"></i> المستخدمون</a>
+    </nav>
+    <div class="sidebar-footer">Smart Lab &copy; 2026</div>
+  </aside>
+
+  <header class="topbar">
+    <span class="topbar-title">التقارير</span>
+    <div class="topbar-actions">
+      <div class="alert-bell" onclick="window.location='/alerts.html'"><i class="fas fa-bell"></i><span class="badge-count" id="unread-count" style="display:none">0</span></div>
+      <div class="topbar-user"><div class="avatar" id="user-avatar">م</div><span id="user-name">مستخدم</span></div>
+      <button class="btn btn-outline btn-sm" id="logout-btn"><i class="fas fa-sign-out-alt"></i> خروج</button>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h2 class="page-title">تقارير المختبر</h2>
+      <button class="btn btn-outline" onclick="window.print()"><i class="fas fa-print"></i> طباعة</button>
+    </div>
+
+    <!-- فلتر تاريخ -->
+    <div class="card" style="margin-bottom:1rem;padding:.85rem 1.25rem">
+      <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+        <label class="form-label" style="margin:0">من:</label>
+        <input type="date" id="from-date" class="form-control" style="max-width:160px" />
+        <label class="form-label" style="margin:0">إلى:</label>
+        <input type="date" id="to-date"   class="form-control" style="max-width:160px" />
+        <button class="btn btn-primary btn-sm" id="apply-btn"><i class="fas fa-filter"></i> تطبيق</button>
+      </div>
+    </div>
+
+    <!-- بطاقات الإحصاء -->
+    <div class="grid grid-4" style="margin-bottom:1.5rem">
+      <div class="stat-card"><div class="stat-icon" style="background:#eff6ff"><i class="fas fa-desktop" style="color:var(--primary)"></i></div><div class="stat-info"><div class="stat-value" id="r-total">—</div><div class="stat-label">إجمالي الأجهزة</div></div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:#fef2f2"><i class="fas fa-triangle-exclamation" style="color:var(--danger)"></i></div><div class="stat-info"><div class="stat-value" id="r-issues">—</div><div class="stat-label">إجمالي البلاغات</div></div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:#f0fdf4"><i class="fas fa-clock" style="color:var(--success)"></i></div><div class="stat-info"><div class="stat-value" id="r-avg">—</div><div class="stat-label">متوسط وقت الإصلاح (ساعة)</div></div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:#fff7ed"><i class="fas fa-circle-check" style="color:var(--warning)"></i></div><div class="stat-info"><div class="stat-value" id="r-resolved">—</div><div class="stat-label">تم حلها</div></div></div>
+    </div>
+
+    <div class="grid grid-1-2">
+      <!-- Bar chart -->
+      <div class="card" style="min-height:360px">
+        <div class="card-header"><span class="card-title"><i class="fas fa-chart-bar" style="color:var(--primary)"></i> البلاغات الشهرية</span></div>
+        <canvas id="bar-chart" height="220"></canvas>
+      </div>
+
+      <!-- أكثر الأجهزة أعطالاً -->
+      <div class="card">
+        <div class="card-header"><span class="card-title"><i class="fas fa-ranking-star" style="color:var(--danger)"></i> أكثر الأجهزة أعطالاً</span></div>
+        <div id="top-broken-list"></div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { requireAuth, apiGet, fillTopbar, setActiveNav, logout, filterSidebar, guardPage } from '/js/api.js';
+
+    const user = requireAuth(); if(!user) throw new Error('stop');
+    if(!guardPage('admin','technician')) throw new Error('stop');
+    fillTopbar(); setActiveNav();
+    filterSidebar();
+    document.getElementById('logout-btn').addEventListener('click', logout);
+
+    const AR_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+    let barChart = null;
+
+    async function load() {
+      const from = document.getElementById('from-date').value;
+      const to   = document.getElementById('to-date').value;
+      let url    = '/api/reports/summary';
+      if (from||to) url += `?from=${from}&to=${to}`;
+
+      const res = await apiGet(url);
+
+      // stats
+      document.getElementById('r-total').textContent    = res.device_stats?.total ?? '—';
+      document.getElementById('r-issues').textContent   = res.issue_stats?.total ?? '—';
+      document.getElementById('r-avg').textContent      = res.avg_fix_hours ? Math.round(res.avg_fix_hours) : '—';
+      document.getElementById('r-resolved').textContent = res.issue_stats?.resolved ?? '—';
+
+      // Unread alerts
+      try { const a=await apiGet('/api/alerts?is_read=0'); if(a.unread>0){const el=document.getElementById('unread-count');el.textContent=a.unread;el.style.display='flex';} } catch{}
+
+      // Bar chart
+      const monthly = res.monthly_issues || [];
+      const labels  = monthly.map(m => { const [y,mo]=m.month.split('-'); return AR_MONTHS[parseInt(mo)-1]||m.month; });
+      const data    = monthly.map(m => m.count);
+
+      if (barChart) barChart.destroy();
+      barChart = new Chart(document.getElementById('bar-chart').getContext('2d'), {
+        type: 'bar',
+        data: { labels, datasets:[{ label:'عدد البلاغات', data, backgroundColor:'rgba(59,130,246,.75)', borderRadius:6 }] },
+        options: { responsive:true, plugins:{ legend:{display:false} }, scales:{ y:{beginAtZero:true,ticks:{stepSize:1}} } }
+      });
+
+      // Top broken
+      const top  = res.top_broken || [];
+      const list = document.getElementById('top-broken-list');
+      if(!top.length){ list.innerHTML='<div class="empty-state"><i class="fas fa-check-circle" style="color:var(--success)"></i><p>لا توجد بيانات</p></div>'; return; }
+      list.innerHTML = top.map((d,i) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.7rem 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;gap:.75rem;align-items:center">
+            <span style="width:26px;height:26px;background:var(--primary);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem">${i+1}</span>
+            <a href="/device.html?id=${d.id}" style="color:var(--text);font-weight:600">${d.name}</a>
+          </div>
+          <span class="badge badge-broken">${d.issue_count} أعطال</span>
+        </div>`).join('');
+    }
+
+    // Set default date range (last 3 months)
+    const now = new Date();
+    document.getElementById('to-date').value   = now.toISOString().slice(0,10);
+    now.setMonth(now.getMonth()-3);
+    document.getElementById('from-date').value = now.toISOString().slice(0,10);
+
+    document.getElementById('apply-btn').addEventListener('click', load);
+    load();
+  </script>
+</body>
+</html>

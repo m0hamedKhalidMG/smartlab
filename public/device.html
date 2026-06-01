@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>تفاصيل الجهاز — Smart Lab</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-brand"><i class="fas fa-laptop-code"></i><span>Smart Lab</span></div>
+    <nav class="sidebar-nav">
+      <a href="/dashboard.html"   class="nav-item" data-page="dashboard.html"   data-roles="admin,technician">        <i class="fas fa-gauge-high"></i>           لوحة التحكم</a>
+      <a href="/devices.html"     class="nav-item" data-page="devices.html"     data-roles="admin,technician">        <i class="fas fa-desktop"></i>             الأجهزة</a>
+      <a href="/issues.html"      class="nav-item" data-page="issues.html"      data-roles="admin,technician,user">   <i class="fas fa-triangle-exclamation"></i> بلاغاتي</a>
+      <a href="/maintenance.html" class="nav-item" data-page="maintenance.html" data-roles="admin,technician">        <i class="fas fa-screwdriver-wrench"></i>   الصيانة</a>
+      <a href="/map.html"         class="nav-item" data-page="map.html"         data-roles="admin,technician">        <i class="fas fa-map"></i>                 الخريطة</a>
+      <a href="/alerts.html"      class="nav-item" data-page="alerts.html"      data-roles="admin,technician">        <i class="fas fa-bell"></i>                التنبيهات</a>
+      <a href="/ai.html"          class="nav-item" data-page="ai.html"          data-roles="admin,technician,user">   <i class="fas fa-robot"></i>               مساعد AI</a>
+      <a href="/reports.html"     class="nav-item" data-page="reports.html"     data-roles="admin,technician">        <i class="fas fa-chart-bar"></i>           التقارير</a>
+      <a href="/admin.html"       class="nav-item" data-page="admin.html" id="admin-link" data-roles="admin">         <i class="fas fa-users-cog"></i> المستخدمون</a>
+    </nav>
+    <div class="sidebar-footer">Smart Lab &copy; 2026</div>
+  </aside>
+
+  <header class="topbar">
+    <span class="topbar-title" id="page-title">تفاصيل الجهاز</span>
+    <div class="topbar-actions">
+      <div class="alert-bell" onclick="window.location='/alerts.html'"><i class="fas fa-bell"></i><span class="badge-count" id="unread-count" style="display:none">0</span></div>
+      <div class="topbar-user"><div class="avatar" id="user-avatar">م</div><span id="user-name">مستخدم</span></div>
+      <button class="btn btn-outline btn-sm" id="logout-btn"><i class="fas fa-sign-out-alt"></i> خروج</button>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h2 class="page-title" id="device-title">جاري التحميل...</h2>
+      <a href="/devices.html" class="btn btn-outline"><i class="fas fa-arrow-right"></i> رجوع للأجهزة</a>
+    </div>
+
+    <div id="device-content">
+      <div class="spinner"></div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { apiGet, apiPatch, apiPost, fillTopbar, setActiveNav, logout, toast, formatDate, filterSidebar } from '/js/api.js';
+    import { getToken, getUser } from '/js/api.js';
+
+    fillTopbar(); setActiveNav();
+    filterSidebar();
+    document.getElementById('logout-btn').addEventListener('click', logout);
+
+    const params = new URLSearchParams(window.location.search);
+    const deviceId = params.get('id');
+    const token    = params.get('token'); // وصول عبر QR
+
+    const user    = getUser();
+    const isLogin = !!getToken();
+
+    const STATUS_LBL  = { working:'يعمل', broken:'متوقف', maintenance:'صيانة' };
+    const STATUS_MAP  = { working:'badge-working', broken:'badge-broken', maintenance:'badge-maintenance' };
+    const ISSUE_LBL   = { open:'مفتوح', in_progress:'قيد العمل', resolved:'محلول' };
+    const ISSUE_MAP   = { open:'badge-open', in_progress:'badge-in_progress', resolved:'badge-resolved' };
+    const PRIORI_LBL  = { low:'منخفضة', medium:'متوسطة', high:'عالية' };
+
+    function renderDevice(data) {
+      const d = data.device;
+      const issues = data.recent_issues || [];
+      document.getElementById('device-title').textContent = d.name;
+      document.title = `${d.name} — Smart Lab`;
+
+      const canEdit = isLogin && user && ['admin','technician'].includes(user.role);
+
+      document.getElementById('device-content').innerHTML = `
+        <div class="grid grid-1-2" style="margin-bottom:1rem">
+          <!-- Card تفاصيل -->
+          <div class="card" style="align-self:start">
+            <div style="text-align:center;padding:1rem 0">
+              <i class="fas fa-desktop" style="font-size:4rem;color:var(--primary)"></i>
+              <div style="margin-top:.75rem">
+                <h3 style="font-size:1.4rem;font-weight:800">${d.name}</h3>
+                <span class="badge ${STATUS_MAP[d.status]}" style="margin-top:.3rem">${STATUS_LBL[d.status]}</span>
+              </div>
+            </div>
+            <hr style="border-color:var(--border)" />
+            <div style="padding:.5rem 0">
+              ${row('النوع', d.type)} ${row('المعالج', d.processor)} ${row('الرام', d.ram)}
+              ${row('نظام التشغيل', d.os)} ${row('العمر', d.age_years ? d.age_years+' سنوات' : null)}
+              ${row('تاريخ الشراء', formatDate(d.purchase_date))} ${row('آخر صيانة', formatDate(d.last_maintenance))}
+              ${d.notes ? row('ملاحظات', d.notes) : ''}
+            </div>
+            ${canEdit ? `
+            <div style="display:flex;gap:.6rem;margin-top:1rem;flex-wrap:wrap">
+              <button class="btn btn-primary btn-sm" onclick="window.location='/devices.html'"><i class="fas fa-pen"></i> تعديل</button>
+              <a href="/issues.html?device=${d.id}" class="btn btn-outline btn-sm"><i class="fas fa-triangle-exclamation"></i> إبلاغ عن عطل</a>
+              <button class="btn btn-outline btn-sm" onclick="downloadQr(${d.id},'${d.name}')"><i class="fas fa-qrcode"></i> QR</button>
+            </div>
+            ${canEdit ? statusButtons(d.id, d.status) : ''}
+            ` : `<a href="/issues.html?device=${d.id}" class="btn btn-warning" style="width:100%;justify-content:center;margin-top:.5rem"><i class="fas fa-triangle-exclamation"></i> إبلاغ عن عطل</a>`}
+          </div>
+
+          <!-- سجل الأعطال -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title"><i class="fas fa-history" style="color:var(--danger)"></i> آخر الأعطال</span>
+              <a href="/issues.html?device=${d.id}" class="btn btn-outline btn-sm">عرض الكل</a>
+            </div>
+            ${issues.length ? `
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th>نوع المشكلة</th><th>الأولوية</th><th>الحالة</th><th>التاريخ</th></tr></thead>
+                <tbody>${issues.map(i=>`
+                  <tr>
+                    <td>${i.issue_type}</td>
+                    <td><span class="badge badge-${i.priority}">${PRIORI_LBL[i.priority]}</span></td>
+                    <td><span class="badge ${ISSUE_MAP[i.status]}">${ISSUE_LBL[i.status]}</span></td>
+                    <td>${formatDate(i.created_at)}</td>
+                  </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>` : '<div class="empty-state"><i class="fas fa-check-circle" style="color:var(--success)"></i><p>لا توجد أعطال مسجلة</p></div>'}
+          </div>
+        </div>`;
+    }
+
+    function row(label, val) {
+      if (!val || val === '—') return '';
+      return `<div style="display:flex;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.9rem"><span style="color:var(--text-muted)">${label}</span><span style="font-weight:600">${val}</span></div>`;
+    }
+
+    function statusButtons(id, current) {
+      const opts = [{v:'working',l:'✅ يعمل'},{v:'broken',l:'❌ متوقف'},{v:'maintenance',l:'🛠 صيانة'}].filter(o=>o.v!==current);
+      return `<div style="margin-top:.5rem;display:flex;gap:.5rem;flex-wrap:wrap">${opts.map(o=>`<button class="btn btn-outline btn-sm" onclick="setStatus(${id},'${o.v}')">${o.l}</button>`).join('')}</div>`;
+    }
+
+    window.setStatus = async (id, status) => {
+      try { await apiPatch(`/api/devices/${id}/status`, { status }); toast('تم تحديث الحالة','success'); loadDevice(); }
+      catch(e) { toast(e.message,'error'); }
+    };
+
+    window.downloadQr = async (id, name) => {
+      const token = localStorage.getItem('token');
+      try {
+        const res = await fetch(`/api/devices/${id}/qr`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('غير مصرح');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `QR-${name}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        toast(e.message, 'error');
+      }
+    };
+
+    async function loadDevice() {
+      try {
+        let data;
+        if (token) {
+          // وصول عبر QR — بدون JWT
+          const res = await fetch(`/qr/${token}/data`);
+          data = await res.json();
+        } else if (deviceId) {
+          data = await apiGet(`/api/devices/${deviceId}`);
+        } else {
+          document.getElementById('device-content').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>لم يتم تحديد جهاز</p></div>';
+          return;
+        }
+        renderDevice(data);
+      } catch(e) {
+        document.getElementById('device-content').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>حدث خطأ في تحميل البيانات</p></div>';
+      }
+    }
+
+    if (!isLogin && !token) { window.location.href = '/index.html'; } else loadDevice();
+  </script>
+</body>
+</html>

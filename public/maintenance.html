@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>سجل الصيانة — Smart Lab</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-brand"><i class="fas fa-laptop-code"></i><span>Smart Lab</span></div>
+    <nav class="sidebar-nav">
+      <a href="/dashboard.html"   class="nav-item" data-page="dashboard.html"   data-roles="admin,technician">        <i class="fas fa-gauge-high"></i>           لوحة التحكم</a>
+      <a href="/devices.html"     class="nav-item" data-page="devices.html"     data-roles="admin,technician">        <i class="fas fa-desktop"></i>             الأجهزة</a>
+      <a href="/issues.html"      class="nav-item" data-page="issues.html"      data-roles="admin,technician,user">   <i class="fas fa-triangle-exclamation"></i> بلاغاتي</a>
+      <a href="/maintenance.html" class="nav-item" data-page="maintenance.html" data-roles="admin,technician">        <i class="fas fa-screwdriver-wrench"></i>   الصيانة</a>
+      <a href="/map.html"         class="nav-item" data-page="map.html"         data-roles="admin,technician">        <i class="fas fa-map"></i>                 الخريطة</a>
+      <a href="/alerts.html"      class="nav-item" data-page="alerts.html"      data-roles="admin,technician">        <i class="fas fa-bell"></i>                التنبيهات</a>
+      <a href="/ai.html"          class="nav-item" data-page="ai.html"          data-roles="admin,technician,user">   <i class="fas fa-robot"></i>               مساعد AI</a>
+      <a href="/reports.html"     class="nav-item" data-page="reports.html"     data-roles="admin,technician">        <i class="fas fa-chart-bar"></i>           التقارير</a>
+      <a href="/admin.html"       class="nav-item" data-page="admin.html" id="admin-link" data-roles="admin">         <i class="fas fa-users-cog"></i> المستخدمون</a>
+    </nav>
+    <div class="sidebar-footer">Smart Lab &copy; 2026</div>
+  </aside>
+
+  <header class="topbar">
+    <span class="topbar-title">سجل الصيانة</span>
+    <div class="topbar-actions">
+      <div class="alert-bell" onclick="window.location='/alerts.html'"><i class="fas fa-bell"></i><span class="badge-count" id="unread-count" style="display:none">0</span></div>
+      <div class="topbar-user"><div class="avatar" id="user-avatar">م</div><span id="user-name">مستخدم</span></div>
+      <button class="btn btn-outline btn-sm" id="logout-btn"><i class="fas fa-sign-out-alt"></i> خروج</button>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <h2 class="page-title" style="margin-bottom:1rem">سجل عمليات الصيانة</h2>
+
+    <!-- فلاتر -->
+    <div class="card" style="margin-bottom:1rem;padding:.85rem 1.25rem">
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
+        <input type="date" id="from-date" class="form-control" style="max-width:160px" placeholder="من" />
+        <input type="date" id="to-date"   class="form-control" style="max-width:160px" placeholder="إلى" />
+        <input id="tech-inp" class="form-control" placeholder="اسم الفني..." style="max-width:200px" />
+        <button class="btn btn-primary btn-sm" id="filter-btn"><i class="fas fa-filter"></i> تصفية</button>
+        <button class="btn btn-outline btn-sm" id="reset-btn"><i class="fas fa-rotate-right"></i> إعادة ضبط</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>#</th><th>الجهاز</th><th>الفني</th><th>ملاحظات</th><th>التاريخ</th></tr>
+          </thead>
+          <tbody id="maint-tbody">
+            <tr><td colspan="5" style="text-align:center;padding:2rem"><i class="fas fa-spinner fa-spin"></i></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { requireAuth, apiGet, fillTopbar, setActiveNav, logout, toast, formatDate, filterSidebar, guardPage } from '/js/api.js';
+
+    const user = requireAuth(); if(!user) throw new Error('stop');
+    if(!guardPage('admin','technician')) throw new Error('stop');
+    fillTopbar(); setActiveNav();
+    filterSidebar();
+    document.getElementById('logout-btn').addEventListener('click', logout);
+
+    let currentPage = 1;
+
+    async function load() {
+      const from = document.getElementById('from-date').value;
+      const to   = document.getElementById('to-date').value;
+      const tech = document.getElementById('tech-inp').value;
+      let url    = `/api/reports/maintenance?page=${currentPage}&limit=12`;
+      if (from) url += `&from=${from}`;
+      if (to)   url += `&to=${to}`;
+      if (tech) url += `&technician=${encodeURIComponent(tech)}`;
+
+      const res  = await apiGet(url);
+      const tbody = document.getElementById('maint-tbody');
+
+      if (!res.logs.length) {
+        tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fas fa-inbox"></i><p>لا توجد سجلات</p></div></td></tr>';
+      } else {
+        tbody.innerHTML = res.logs.map((l,i) => `
+          <tr>
+            <td>${(currentPage-1)*12 + i + 1}</td>
+            <td>${l.device_name||'—'}</td>
+            <td>${l.technician_name||l.performed_by_name||'—'}</td>
+            <td style="max-width:300px;white-space:normal">${l.notes||'—'}</td>
+            <td>${formatDate(l.performed_at||l.created_at)}</td>
+          </tr>`).join('');
+      }
+      buildPagination(res.total, 12);
+
+      // Unread alerts
+      try { const a=await apiGet('/api/alerts?is_read=0'); if(a.unread>0){const el=document.getElementById('unread-count');el.textContent=a.unread;el.style.display='flex';} } catch{}
+    }
+
+    function buildPagination(total, limit) {
+      const pages = Math.ceil(total/limit);
+      const parent = document.getElementById('pagination');
+      if(pages<=1){parent.innerHTML='';return;}
+      let html = `<button class="page-btn" ${currentPage===1?'disabled':''} onclick="changePage(${currentPage-1})">‹</button>`;
+      for(let i=1;i<=pages;i++) html+=`<button class="page-btn ${i===currentPage?'active':''}" onclick="changePage(${i})">${i}</button>`;
+      html += `<button class="page-btn" ${currentPage===pages?'disabled':''} onclick="changePage(${currentPage+1})">›</button>`;
+      parent.innerHTML = html;
+    }
+
+    window.changePage = (p) => { currentPage = p; load(); };
+    document.getElementById('filter-btn').addEventListener('click', () => { currentPage=1; load(); });
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      document.getElementById('from-date').value='';
+      document.getElementById('to-date').value='';
+      document.getElementById('tech-inp').value='';
+      currentPage=1; load();
+    });
+
+    load();
+  </script>
+</body>
+</html>
